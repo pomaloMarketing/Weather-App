@@ -46,41 +46,63 @@ try
     // 'JsonConvert' turns the raw text string into a dynamic object we can navigate like a folder structure.
     dynamic zoneData = JsonConvert.DeserializeObject(zoneJson);
 
-    Console.WriteLine("\nLOCAL ENTITIES (Zones) - First 10:");
-    // visual divider only
-    Console.WriteLine("----------------------------------");
-    
-    // We loop through the first 10 zones returned to provide the user with specific options.
-    for (int i = 0; i < 10; i++)
+    //  Pagination to load more Zones  -loop through 
+    int pageSize = 10;
+    //start 
+    int currentPointer = 0;
+    //gather everything
+    int totalZones = zoneData.features.Count;
+    string selectedId = "";
+
+    while (currentPointer < totalZones)
     {
-        // The '?' (null-conditional) prevents a crash if the API returns fewer than 10 results.
-        // properties has @id /zones/forecast/{state}. 
-        // props.id is the key to narrowing done filter to city/ county
-        // props.id provides the unique Zone Code (e.g., COZ039).
-        // props.name provides the human-readable region name (e.g., Boulder).
-        // We print these so the user knows which ID to type in for the next step.
+        // prevent crash 
+        int endOfBatch = Math.Min(currentPointer + pageSize, totalZones);
+        Console.WriteLine($"\nLOCAL ENTITIES - Displaying {currentPointer + 1} to {endOfBatch} of {totalZones}:");
+        //visual helper
+        Console.WriteLine("----------------------------------");
 
-        var props = zoneData?.features[i]?.properties;
-        if (props != null) 
+        for (int i = currentPointer; i < endOfBatch; i++)
         {
-            // Prints the Zone ID (used for the next API call) and the name (for the user).
-            // First call gets state info -> second gets city/ county info
+            var props = zoneData.features[i].properties;
+            if (props != null)
+            {
+                Console.WriteLine($"[{props.id}] - {props.name}");
+            }
+        }
 
-            // string interpolation - $ means code variables inside
-            // props.id gets zone id
-            // props.name get city name
-            // hyphen is just visual helper
+        // update current
+        currentPointer = endOfBatch;
 
-            Console.WriteLine($"[{props.id}] - {props.name}");
+        if (currentPointer < totalZones)
+        {
+            Console.Write("\nType a [Zone ID] for forecast, or press 'ENTER' to see 10 more: ");
+            string input = Console.ReadLine()?.Trim().ToUpper() ?? "";
+
+            if (!string.IsNullOrEmpty(input))
+            {
+                selectedId = input;
+                break; // User entered an ID, exit the list loop
+            }
+        }
+        else
+        {
+            Console.Write("\nEnd of list. Enter a Zone ID to get forecast: ");
+            selectedId = Console.ReadLine()?.Trim().ToUpper() ?? "";
         }
     }
-
     // 4. Requirement: Detailed Forecast based on Selection
-    Console.Write("\nSelect a Zone ID from the list (e.g., COZ039): ");
-    string selectedId = Console.ReadLine()?.Trim() ?? "";
+    
+            // only prompt the user if selectedId is still empty (meaning they reached the end of the list)
+        if (string.IsNullOrEmpty(selectedId)) 
+        {
+            Console.Write("\nSelect a Zone ID from the list (e.g., COZ039): ");
+            selectedId = Console.ReadLine()?.Trim().ToUpper() ?? "";
+        }
+    
 
-    // We now hit a different endpoint specifically for the forecast of the chosen ID.
-    //https://api.weather.gov/zones/public/NYZ001/forecast
+    // New endpoint specifically for the forecast of the chosen ID.
+    // https://api.weather.gov/zones/public/NYZ001/forecast
 
     string forecastUrl = $"https://api.weather.gov/zones/public/{selectedId}/forecast";
     string forecastJson = await client.GetStringAsync(forecastUrl);
